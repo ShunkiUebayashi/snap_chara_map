@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Edit Location</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Update</button>
+    <a href="{% url 'theme_detail' location.theme.id %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

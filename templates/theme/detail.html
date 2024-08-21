@@ -1,0 +1,49 @@
+<!-- map_app/templates/theme/detail.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>{{ theme.name }}</h1>
+<p>Created on: {{ theme.created_at|date:"Y-m-d" }}</p>
+
+<div class="mb-3">
+    <a href="{% url 'upload_photo' theme.id %}" class="btn btn-primary">Upload Photo</a>
+    <a href="{% url 'view_map' theme.id %}" class="btn btn-secondary">View Map</a>
+</div>
+
+
+
+{% if photos %}
+<h2>Photos</h2>
+<div class="row">
+    {% for photo in photos %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <img src="{{ photo.image.url }}" class="card-img-top" alt="{{ photo.caption }}">
+            <div class="card-body">
+                <h5 class="card-title">{{ photo.location.name }}</h5>
+                <p class="card-text">{{ photo.caption }}</p>
+                <p class="card-text"><small class="text-muted">Taken on: {{ photo.taken_at|date:"Y-m-d H:i" }}</small>
+                </p>
+                <a href="{% url 'delete_photo' photo.id %}" class="btn btn-danger btn-sm">Delete Photo</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p>No photos uploaded yet.</p>
+{% endif %}
+
+<h2>Locations</h2>
+<ul>
+    {% for location in locations %}
+    <li>
+        {{ location.name }} ({{ location.latitude }}, {{ location.longitude }})
+        <a href="{% url 'edit_location' location.id %}" class="btn btn-sm btn-primary">Edit</a>
+        <a href="{% url 'delete_location' location.id %}" class="btn btn-sm btn-danger">Delete</a>
+    </li>
+    {% empty %}
+    <li>No locations added yet.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

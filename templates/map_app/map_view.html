@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ theme.name }} Map - Photo Mapping App{% endblock %}
+
+{% block extra_css %}
+<style>
+    .map-container {
+        display: flex;
+        height: calc(100vh - 100px);
+    }
+
+    #map {
+        flex: 2;
+        height: 100%;
+        border: 1px solid red;
+        /* デバッグ用の境界線 */
+    }
+
+    #photo-gallery {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background-color: #f8f9fa;
+    }
+
+    .photo-item {
+        margin-bottom: 20px;
+        background-color: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .photo-item img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+    }
+
+    .photo-info {
+        padding: 10px;
+    }
+
+    #debug-info {
+        background-color: #ffe6e6;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ff0000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{{ theme.name }} Map</h1>
+
+<div id="debug-info">
+    <h3>デバッグ情報:</h3>
+    <p>Google Maps API Key: {{ google_maps_api_key|default:"Not set" }}</p>
+    <p>Locations Data:
+    <pre>{{ locations_data|safe }}</pre>
+    </p>
+</div>
+
+<div class="map-container">
+    <div id="map"></div>
+    <div id="photo-gallery"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let map;
+    let markers = [];
+
+    function initMap() {
+        console.log("initMap function called");
+        try {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 35.6762, lng: 139.6503 },
+                zoom: 10
+            });
+            console.log("Map object created");
+
+            const locations = {{ locations_data| safe
+        }};
+    console.log("Locations data:", locations);
+
+    const bounds = new google.maps.LatLngBounds();
+
+    locations.forEach(location => {
+        console.log("Creating marker for location:", location);
+        const marker = new google.maps.Marker({
+            position: { lat: location.lat, lng: location.lng },
+            map: map,
+            title: location.name
+        });
+
+        bounds.extend(marker.getPosition());
+
+        marker.addListener('click', () => {
+            showPhotos(location.photos);
+        });
+
+        markers.push(marker);
+    });
+
+    map.fitBounds(bounds);
+    console.log("Map bounds set");
+    } catch (error) {
+        console.error("Error in initMap:", error);
+        document.getElementById('debug-info').innerHTML += `<p>Error in initMap: ${error.message}</p>`;
+    }
+}
+
+    function showPhotos(photos) {
+        const gallery = document.getElementById('photo-gallery');
+        gallery.innerHTML = '';
+
+        photos.forEach(photo => {
+            const photoElement = document.createElement('div');
+            photoElement.className = 'photo-item';
+            photoElement.innerHTML = `
+            <img src="${photo.url}" alt="${photo.caption}">
+            <div class="photo-info">
+                <p>${photo.caption}</p>
+                <small>Date: ${photo.date}</small>
+            </div>
+        `;
+            gallery.appendChild(photoElement);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("DOM fully loaded");
+        if (typeof google === 'undefined') {
+            console.error("Google Maps API not loaded");
+            document.getElementById('debug-info').innerHTML += "<p>Error: Google Maps API not loaded</p>";
+        } else {
+            console.log("Google Maps API loaded");
+            initMap();
+        }
+    });
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap" async
+    defer></script>
+{% endblock %}

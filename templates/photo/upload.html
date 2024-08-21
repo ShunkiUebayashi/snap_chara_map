@@ -1,0 +1,281 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload Photo - {{ theme.name }} - Photo Mapping App{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map {
+        height: 400px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    #pac-input {
+        background-color: #fff;
+        font-family: Roboto;
+        font-size: 15px;
+        font-weight: 300;
+        margin-left: 12px;
+        padding: 0 11px 0 13px;
+        text-overflow: ellipsis;
+        width: 300px;
+    }
+
+    .error-message {
+        color: red;
+        font-size: 0.9em;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Upload Photo for {{ theme.name }}</h1>
+
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-{{ message.tags }}">{{ message }}</div>
+{% endfor %}
+{% endif %}
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="id_image" class="form-label">Photo</label>
+        {{ photo_form.image }}
+    </div>
+    <div id="image-preview" class="mb-3"></div>
+    <div class="mb-3">
+        <label for="id_caption" class="form-label">Caption</label>
+        {{ photo_form.caption }}
+    </div>
+    <div class="mb-3">
+        <label for="id_taken_at" class="form-label">Date Taken</label>
+        {{ photo_form.taken_at }}
+    </div>
+    <div class="mb-3">
+        <label for="id_location" class="form-label">Location</label>
+        {{ location_form.location }}
+    </div>
+    <div id="new-location-fields" style="display: none;">
+        <div class="mb-3">
+            <label for="id_name" class="form-label">New Location Name</label>
+            {{ new_location_form.name }}
+            <div id="name-error" class="error-message"></div>
+        </div>
+        {{ new_location_form.latitude }}
+        {{ new_location_form.longitude }}
+    </div>
+    <div class="mb-3">
+        <input id="pac-input" class="controls" type="text" placeholder="Search for a place">
+    </div>
+    <div id="map"></div>
+    <button type="submit" class="btn btn-primary" id="upload-button">Upload Photo</button>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places"></script>
+<script>
+    let map;
+    let marker;
+    let existingLocations = {{ locations_json| safe }};
+    const initialLocation = {{ initial_location| safe }};
+
+    function initMap() {
+        map = new google.maps.Map(document.getElementById("map"), {
+            center: { lat: 35.6762, lng: 139.6503 },
+            zoom: 13,
+        });
+
+        const input = document.getElementById("pac-input");
+        const searchBox = new google.maps.places.SearchBox(input);
+
+        map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+
+        map.addListener("bounds_changed", () => {
+            searchBox.setBounds(map.getBounds());
+        });
+
+        searchBox.addListener("places_changed", () => {
+            const places = searchBox.getPlaces();
+
+            if (places.length == 0) {
+                return;
+            }
+
+            const bounds = new google.maps.LatLngBounds();
+
+            places.forEach((place) => {
+                if (!place.geometry || !place.geometry.location) {
+                    console.log("Returned place contains no geometry");
+                    return;
+                }
+
+                updateMarkerAndForm(place.geometry.location, place.name);
+
+                if (place.geometry.viewport) {
+                    bounds.union(place.geometry.viewport);
+                } else {
+                    bounds.extend(place.geometry.location);
+                }
+            });
+            map.fitBounds(bounds);
+        });
+
+        map.addListener("click", (mapsMouseEvent) => {
+            updateMarkerAndForm(mapsMouseEvent.latLng);
+        });
+
+        // Add markers for existing locations
+        existingLocations.forEach(location => {
+            new google.maps.Marker({
+                position: { lat: location.latitude, lng: location.longitude },
+                map: map,
+                title: location.name,
+            });
+        });
+
+        // Set initial location if available
+        if (initialLocation) {
+            const latLng = new google.maps.LatLng(initialLocation.latitude, initialLocation.longitude);
+            updateMarkerAndForm(latLng, initialLocation.name);
+            map.setCenter(latLng);
+            map.setZoom(15);
+        }
+    }
+
+    function updateMarkerAndForm(location, name = "") {
+        if (marker) {
+            marker.setMap(null);
+        }
+
+        marker = new google.maps.Marker({
+            position: location,
+            map: map,
+        });
+
+        const lat = location.lat();
+        const lng = location.lng();
+
+        // Check if the selected location matches an existing location
+        const existingLocation = existingLocations.find(loc =>
+            Math.abs(loc.latitude - lat) < 0.0001 && Math.abs(loc.longitude - lng) < 0.0001
+        );
+
+        if (existingLocation) {
+            // If it's an existing location, update the dropdown
+            document.getElementById("id_location").value = existingLocation.id;
+            hideNewLocationFields();
+
+            // Set new location fields with existing location data
+            document.getElementById("id_latitude").value = existingLocation.latitude;
+            document.getElementById("id_longitude").value = existingLocation.longitude;
+            document.getElementById("id_name").value = existingLocation.name;
+        } else {
+            // If it's a new location, show the new location fields
+            document.getElementById("id_location").value = "";
+            showNewLocationFields();
+            document.getElementById("id_latitude").value = lat;
+            document.getElementById("id_longitude").value = lng;
+            document.getElementById("id_name").value = name || "New Location";
+        }
+        checkLocationName();
+    }
+
+    function showNewLocationFields() {
+        document.getElementById("new-location-fields").style.display = "block";
+    }
+
+    function hideNewLocationFields() {
+        document.getElementById("new-location-fields").style.display = "none";
+    }
+
+    document.addEventListener('DOMContentLoaded', (event) => {
+        initMap();
+
+        const locationSelect = document.getElementById('id_location');
+        const nameField = document.getElementById('id_name');
+        const form = document.querySelector('form');
+        const uploadButton = document.getElementById('upload-button');
+        const newLocationNameField = document.getElementById('id_name');
+        const nameErrorDiv = document.getElementById('name-error');
+
+        function checkLocationName() {
+            const newName = newLocationNameField.value.trim().toLowerCase();
+            const isDuplicate = existingLocations.some(loc =>
+                loc.name.toLowerCase() === newName
+            );
+
+            if (isDuplicate && locationSelect.value === '') {
+                uploadButton.disabled = true;
+                nameErrorDiv.textContent = 'This location name already exists. Please choose a different name.';
+            } else {
+                uploadButton.disabled = false;
+                nameErrorDiv.textContent = '';
+            }
+        }
+
+        newLocationNameField.addEventListener('input', checkLocationName);
+        locationSelect.addEventListener('change', checkLocationName);
+
+        locationSelect.addEventListener('change', function () {
+            if (this.value === '') {
+                showNewLocationFields();
+            } else {
+                hideNewLocationFields();
+                // If an existing location is selected, update the map
+                const selectedLocation = existingLocations.find(loc => loc.id.toString() === this.value);
+                if (selectedLocation) {
+                    const latLng = new google.maps.LatLng(selectedLocation.latitude, selectedLocation.longitude);
+                    updateMarkerAndForm(latLng, selectedLocation.name);
+                    map.setCenter(latLng);
+                    map.setZoom(15);
+                }
+            }
+        });
+
+        // Add form submit event listener
+        form.addEventListener('submit', function (e) {
+            setTimeout(function () {
+                initMap(); // Reinitialize map after form submission
+            }, 100);
+
+            if (locationSelect.value !== '' && (!nameField.value || nameField.style.display === 'none')) {
+                // If an existing location is selected and name field is empty or hidden,
+                // set a default name
+                const selectedLocation = existingLocations.find(loc => loc.id.toString() === locationSelect.value);
+                if (selectedLocation) {
+                    nameField.value = selectedLocation.name;
+                } else {
+                    nameField.value = 'Default Location Name';
+                }
+            } else if (locationSelect.value === '' && !nameField.value) {
+                // If creating a new location and name is empty, set a default name
+                nameField.value = 'New Location';
+            }
+        });
+
+        // Trigger the change event to set the initial state
+        locationSelect.dispatchEvent(new Event('change'));
+
+        // Image preview functionality
+        const fileInput = document.getElementById('id_image');
+        const previewContainer = document.getElementById('image-preview');
+
+        fileInput.addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    previewContainer.innerHTML = `<img src="${e.target.result}" class="img-fluid" alt="Preview">`;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 初期状態のチェック
+        checkLocationName();
+    });
+</script>
+{% endblock %}

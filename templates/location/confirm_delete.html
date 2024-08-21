@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Confirm Delete</h2>
+<p>Are you sure you want to delete the location "{{ location.name }}"?</p>
+<p>This will also delete all photos associated with this location.</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Delete</button>
+    <a href="{% url 'theme_detail' location.theme.id %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

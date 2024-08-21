@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}{{ theme.name }} - Photo Map{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map {
+        height: 600px;
+        width: 100%;
+    }
+
+    .photo-sidebar {
+        overflow-y: scroll;
+        max-height: 600px;
+    }
+
+    .photo-item {
+        margin-bottom: 15px;
+    }
+
+    .photo-item img {
+        max-width: 100%;
+        height: auto;
+    }
+
+    .theme-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    .photo-sidebar h3 {
+        margin-top: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 theme-title">
+        {{ theme.name }}
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-8">
+        <div id="map"></div>
+    </div>
+    <div class="col-md-4">
+        <div class="photo-sidebar">
+            <h3 id="photo-title">Photos</h3>
+            <div id="photo-list"></div>
+        </div>
+    </div>
+</div>
+<script>
+    const locationsData = {{ locations_data| safe }};
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function initMap() {
+        const map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 13,
+            center: { lat: locationsData[0].lat, lng: locationsData[0].lng }
+        });
+
+        locationsData.forEach(location => {
+            const marker = new google.maps.Marker({
+                position: { lat: location.lat, lng: location.lng },
+                map: map,
+                title: location.name
+            });
+
+            marker.addListener('click', () => {
+                showPhotos(location);
+            });
+        });
+    }
+
+    function showPhotos(location) {
+        const photoTitle = document.getElementById('photo-title');
+        photoTitle.textContent = `${location.name}のPhotos`;
+
+        const photoList = document.getElementById('photo-list');
+        photoList.innerHTML = '';
+        location.photos.forEach(photo => {
+            const photoItem = document.createElement('div');
+            photoItem.className = 'photo-item';
+            photoItem.innerHTML = `
+                <img src="${photo.url}" alt="${photo.caption}">
+                <p>${photo.caption} (${photo.date})</p>
+            `;
+            photoList.appendChild(photoItem);
+        });
+    }
+
+    window.onload = initMap;
+</script>
+{% endblock %}

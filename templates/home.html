@@ -1,0 +1,27 @@
+<!-- map_app/templates/home.html -->
+{% extends 'base.html' %}
+
+{% block title %}Home - Photo Mapping App{% endblock %}
+
+{% block content %}
+<h1>Welcome to Photo Mapping</h1>
+{% if themes %}
+<h2>Your Themes</h2>
+<div class="row">
+    {% for theme in themes %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ theme.name }}</h5>
+                <p class="card-text">Created on: {{ theme.created_at|date:"Y-m-d" }}</p>
+                <a href="{% url 'theme_detail' theme.id %}" class="btn btn-primary">View Theme</a>
+                <a href="{% url 'view_map' theme.id %}" class="btn btn-secondary">View Map</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p>You haven't created any themes yet. <a href="{% url 'create_theme' %}">Create your first theme</a>.</p>
+{% endif %}
+{% endblock %}
